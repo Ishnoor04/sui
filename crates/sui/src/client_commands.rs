@@ -81,8 +81,7 @@ use sui_types::{
     signature::GenericSignature,
     sui_serde,
     transaction::{
-        InputObjectKind, SenderSignedData, Transaction, TransactionData, TransactionDataAPI,
-        TransactionKind,
+        InputObjectKind, SenderSignedData, Transaction, TransactionData, TransactionKind,
     },
 };
 
@@ -680,6 +679,13 @@ pub struct GasDataArgs {
     /// tool will use the current reference gas price from RPC.
     #[arg(long)]
     pub gas_price: Option<u64>,
+    /// An optional field to specify a gas sponsor address. If provided, the gas owner is set to
+    /// this address, rather than the transaction's sender.
+    ///
+    /// Note that if the CLI does not have access to the sponsor's keys, it will not be able to
+    /// sign and execute transactions that have a sponsor set.
+    #[arg(long)]
+    pub gas_sponsor: Option<SuiAddress>,
 }
 
 /// Arguments related to what to do to a transaction after it has been built.
@@ -3119,6 +3125,7 @@ pub(crate) async fn dry_run_or_execute_or_serialize(
     let GasDataArgs {
         gas_budget,
         gas_price,
+        gas_sponsor,
     } = gas_data;
 
     let TxProcessingArgs {
@@ -3150,7 +3157,7 @@ pub(crate) async fn dry_run_or_execute_or_serialize(
             gas_budget,
             gas_price,
             gas_payment,
-            None,
+            gas_sponsor,
             None,
         )
         .await;
@@ -3179,7 +3186,7 @@ pub(crate) async fn dry_run_or_execute_or_serialize(
                 tx_kind.clone(),
                 gas_price,
                 gas_payment.clone(),
-                None,
+                gas_sponsor,
             )
             .await?;
             debug!("Finished estimating gas budget");
@@ -3201,7 +3208,13 @@ pub(crate) async fn dry_run_or_execute_or_serialize(
 
         let gas_payment = client
             .transaction_builder()
-            .select_gas(signer, None, gas_budget, input_objects, gas_price)
+            .select_gas(
+                gas_sponsor.unwrap_or(signer),
+                None,
+                gas_budget,
+                input_objects,
+                gas_price,
+            )
             .await?;
 
         vec![gas_payment]
@@ -3214,7 +3227,7 @@ pub(crate) async fn dry_run_or_execute_or_serialize(
         gas_payment,
         gas_budget,
         gas_price,
-        signer,
+        gas_sponsor.unwrap_or(signer),
     );
     debug!("Finished preparing transaction data");
 
@@ -3225,12 +3238,25 @@ pub(crate) async fn dry_run_or_execute_or_serialize(
     } else if tx_digest {
         Ok(SuiClientCommandResult::ComputeTransactionDigest(tx_data))
     } else {
-        let signature = context.config.keystore.sign_secure(
-            &tx_data.sender(),
-            &tx_data,
-            Intent::sui_transaction(),
-        )?;
-        let sender_signed_data = SenderSignedData::new_from_sender_signature(tx_data, signature);
+        let mut signatures = vec![context
+            .config
+            .keystore
+            .sign_secure(&signer, &tx_data, Intent::sui_transaction())?
+            .into()];
+
+        if let Some(gas_sponsor) = gas_sponsor {
+            if gas_sponsor != signer {
+                signatures.push(
+                    context
+                        .config
+                        .keystore
+                        .sign_secure(&gas_sponsor, &tx_data, Intent::sui_transaction())?
+                        .into(),
+                );
+            }
+        }
+
+        let sender_signed_data = SenderSignedData::new(tx_data, signatures);
         if serialize_signed_transaction {
             Ok(SuiClientCommandResult::SerializedSignedTransaction(
                 sender_signed_data,
