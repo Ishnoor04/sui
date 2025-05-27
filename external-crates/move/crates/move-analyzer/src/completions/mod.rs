@@ -11,7 +11,8 @@ use crate::{
     },
     context::Context,
     symbols::{
-        self, Symbols, compilation::CachedPackagesInfo, cursor::CursorContext, runner::SymbolicatorRunner,
+        self, Symbols, compilation::CachedPackagesInfo, cursor::CursorContext,
+        runner::SymbolicatorRunner,
     },
 };
 use lsp_server::{Message, Request, Response};

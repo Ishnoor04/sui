@@ -17,7 +17,9 @@ use move_analyzer::{
     inlay_hints::inlay_hints_internal,
     symbols::{
         Symbols,
-        compilation::{CompiledPkgInfo, CachedPackagesInfo, SymbolsComputationData, get_compiled_pkg},
+        compilation::{
+            CachedPackagesInfo, CompiledPkgInfo, SymbolsComputationData, get_compiled_pkg,
+        },
         compute_symbols, compute_symbols_parsed_program, compute_symbols_pre_process,
         requests::{def_info_doc_string, maybe_convert_for_guard},
         use_def::UseDefMap,

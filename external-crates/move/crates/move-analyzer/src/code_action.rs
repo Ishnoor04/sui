@@ -9,7 +9,7 @@ use crate::{
     context::Context,
     symbols::{
         Symbols,
-        compilation::{CompiledPkgInfo, CachedPackagesInfo, get_compiled_pkg},
+        compilation::{CachedPackagesInfo, CompiledPkgInfo, get_compiled_pkg},
         cursor::{ChainInfo, CursorContext},
         runner::SymbolicatorRunner,
     },
